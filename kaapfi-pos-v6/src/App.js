@@ -1085,7 +1085,7 @@ export default function CafePOS() {
           <input type="password" placeholder="Enter Password" value={loginInput} onChange={(e) => setLoginInput(e.target.value)} onKeyPress={(e) => e.key === 'Enter' && handleLogin()} style={{ width: '100%', padding: '14px', fontSize: '16px', border: '2px solid #e0e0e0', borderRadius: '8px', marginBottom: '16px', boxSizing: 'border-box' }} />
           {loginError && <div style={{ color: '#E64A19', fontSize: '14px', marginBottom: '16px' }}>{loginError}</div>}
           <button onClick={handleLogin} style={{ width: '100%', padding: '14px', fontSize: '16px', fontWeight: '700', background: '#FC8019', color: '#fff', border: 'none', borderRadius: '8px', cursor: 'pointer' }}>LOGIN →</button>
-          <p style={{ marginTop: '24px', fontSize: '12px', color: '#000' }}>🔒 Kaapfi POS v5.0 • Mega Update</p>
+          <p style={{ marginTop: '24px', fontSize: '12px', color: '#000' }}>🔒 Kaapfi POS v6 • Tables + History + Expense Book</p>
         </div>
       </div>
     );
@@ -2910,7 +2910,7 @@ export default function CafePOS() {
 
       <footer style={{ background: '#fff', borderTop: '1px solid #eee', padding: '20px 24px', marginTop: '40px', textAlign: 'center', color: '#000', fontSize: '13px' }}>
         <div>{settings.cafeName} • {settings.address}</div>
-        <div style={{ fontSize: '11px', marginTop: '4px' }}>v5.0 • Marketing + Analytics ☁️</div>
+        <div style={{ fontSize: '11px', marginTop: '4px' }}>v6 • Tables + History + Expense Book ☁️</div>
       </footer>
     </div>
   );
