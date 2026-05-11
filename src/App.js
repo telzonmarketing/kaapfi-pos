@@ -216,7 +216,7 @@ export default function CafePOS() {
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [isPublicMenuMode, setIsPublicMenuMode] = useState(() => {
     const p = new URLSearchParams(window.location.search);
-    return p.get('tab') === 'publicmenu' || window.location.hostname === 'menukaapfi.netlify.app' || window.location.hostname === 'menukaapfi.vercel.app';
+    return p.get('tab') === 'publicmenu' || window.location.hostname === 'menukaapfi.vercel.app' || window.location.hostname === 'menukaapfi.vercel.app';
   });
   const [loginInput, setLoginInput] = useState('');
   const [loginError, setLoginError] = useState('');
@@ -314,7 +314,7 @@ export default function CafePOS() {
     // Check if this is the dedicated menu hostname OR URL param
     const urlParams = new URLSearchParams(window.location.search);
     const tabParam = urlParams.get('tab');
-    const isMenuHost = window.location.hostname === 'menukaapfi.netlify.app';
+    const isMenuHost = window.location.hostname === 'menukaapfi.vercel.app';
     if (tabParam === 'publicmenu' || isMenuHost) {
       setActiveTab('publicmenu');
       setIsPublicMenuMode(true);
@@ -1309,19 +1309,27 @@ export default function CafePOS() {
               <div style={{ display: 'flex', gap: '10px', marginBottom: '16px', flexWrap: 'wrap' }}>
                 {[1, 2, 3, 4].map(t => {
                   const occupied = tableStatus[t] === 'occupied';
+                  const isSelected = selectedTable === t;
                   return (
-                    <div key={t} style={{ flex: '1', minWidth: '80px', background: occupied ? '#FFF3E0' : '#E8F5E9', border: `2px solid ${occupied ? '#E64A19' : '#4CAF50'}`, borderRadius: '10px', padding: '10px', textAlign: 'center', cursor: 'pointer' }}
-                      onClick={() => { if (occupied) { /* show table orders */ } }}>
-                      <div style={{ fontSize: '18px' }}>{occupied ? '🔴' : '🟢'}</div>
-                      <div style={{ fontSize: '13px', fontWeight: '800', color: '#000' }}>Table {t}</div>
-                      <div style={{ fontSize: '11px', fontWeight: '700', color: occupied ? '#E64A19' : '#4CAF50' }}>{occupied ? 'Occupied' : 'Free'}</div>
+                    <div key={t} onClick={() => setSelectedTable(isSelected ? null : t)}
+                      style={{ flex: '1', minWidth: '80px', background: isSelected ? '#FC8019' : occupied ? '#FFF3E0' : '#E8F5E9', border: `2px solid ${isSelected ? '#E64A19' : occupied ? '#E64A19' : '#4CAF50'}`, borderRadius: '10px', padding: '10px', textAlign: 'center', cursor: 'pointer', transition: 'all 0.15s' }}>
+                      <div style={{ fontSize: '18px' }}>{isSelected ? '✅' : occupied ? '🔴' : '🟢'}</div>
+                      <div style={{ fontSize: '13px', fontWeight: '800', color: isSelected ? '#fff' : '#000' }}>Table {t}</div>
+                      <div style={{ fontSize: '11px', fontWeight: '700', color: isSelected ? '#fff' : occupied ? '#E64A19' : '#4CAF50' }}>{isSelected ? 'Selected' : occupied ? 'Occupied' : 'Free'}</div>
+                      {occupied && !isSelected && (
+                        <button onClick={(e) => { e.stopPropagation(); const u = { ...tableStatus, [t]: 'available' }; setTableStatus(u); saveTableStatusToCloud(u); }}
+                          style={{ marginTop: '4px', fontSize: '9px', fontWeight: '800', background: '#E64A19', color: '#fff', border: 'none', borderRadius: '4px', padding: '2px 6px', cursor: 'pointer' }}>
+                          Mark Free
+                        </button>
+                      )}
                     </div>
                   );
                 })}
-                <div style={{ flex: '1', minWidth: '80px', background: '#E3F2FD', border: '2px solid #2196F3', borderRadius: '10px', padding: '10px', textAlign: 'center' }}>
-                  <div style={{ fontSize: '18px' }}>📦</div>
-                  <div style={{ fontSize: '13px', fontWeight: '800', color: '#000' }}>T/A</div>
-                  <div style={{ fontSize: '11px', fontWeight: '700', color: '#2196F3' }}>Takeaway</div>
+                <div onClick={() => setSelectedTable(selectedTable === 'T/A' ? null : 'T/A')}
+                  style={{ flex: '1', minWidth: '80px', background: selectedTable === 'T/A' ? '#FC8019' : '#E3F2FD', border: `2px solid ${selectedTable === 'T/A' ? '#E64A19' : '#2196F3'}`, borderRadius: '10px', padding: '10px', textAlign: 'center', cursor: 'pointer' }}>
+                  <div style={{ fontSize: '18px' }}>{selectedTable === 'T/A' ? '✅' : '📦'}</div>
+                  <div style={{ fontSize: '13px', fontWeight: '800', color: selectedTable === 'T/A' ? '#fff' : '#000' }}>T/A</div>
+                  <div style={{ fontSize: '11px', fontWeight: '700', color: selectedTable === 'T/A' ? '#fff' : '#2196F3' }}>{selectedTable === 'T/A' ? 'Selected' : 'Takeaway'}</div>
                 </div>
               </div>
 
@@ -1349,7 +1357,10 @@ export default function CafePOS() {
             </div>
 
             <div style={{ background: '#fff', borderRadius: '12px', padding: '20px', height: 'fit-content', position: 'sticky', top: '100px', maxHeight: 'calc(100vh - 120px)', overflowY: 'auto' }}>
-              <h3 style={{ margin: '0 0 16px', fontSize: '18px', fontWeight: '700', color: '#000' }}>🛒 Current Order ({currentOrder.length})</h3>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+                <h3 style={{ margin: 0, fontSize: '18px', fontWeight: '700', color: '#000' }}>🛒 Current Order ({currentOrder.length})</h3>
+                {selectedTable && <span style={{ background: '#FC8019', color: '#fff', padding: '4px 12px', borderRadius: '20px', fontSize: '12px', fontWeight: '800' }}>{selectedTable === 'T/A' ? '📦 Takeaway' : `🪑 Table ${selectedTable}`}</span>}
+              </div>
               <input type="tel" placeholder="Customer phone" value={customerPhone} onChange={(e) => handlePhoneChange(e.target.value)} style={{ width: '100%', padding: '10px', fontSize: '14px', border: '2px solid #FC8019', borderRadius: '8px', marginBottom: '10px', boxSizing: 'border-box' }} />
               <input type="text" placeholder="Customer name" value={customerName} onChange={(e) => setCustomerName(e.target.value)} style={{ width: '100%', padding: '10px', fontSize: '14px', border: '1px solid #e0e0e0', borderRadius: '8px', marginBottom: '12px', boxSizing: 'border-box' }} />
 
@@ -2446,7 +2457,7 @@ export default function CafePOS() {
             <div style={{ background: '#fff', padding: '20px', borderRadius: '12px', boxShadow: '0 2px 8px rgba(0,0,0,0.1)', marginBottom: '20px' }}>
               <h3 style={{ fontSize: '16px', margin: '0 0 4px', color: '#000', fontWeight: '800' }}>🌐 Custom Menu URL</h3>
               <p style={{ fontSize: '13px', color: '#666', fontWeight: '600', marginBottom: '12px' }}>Set your custom domain for QR codes (e.g. https://menu.atkaapfi.com). Leave blank to use current site URL.</p>
-              <input type="text" placeholder="https://menukaapfi.netlify.app" defaultValue={settings.menuDomain || 'https://menukaapfi.netlify.app'} onBlur={e => updateSettings({ ...settings, menuDomain: e.target.value.trim() })} style={{ width: '100%', padding: '12px', border: '2px solid #FC8019', borderRadius: '8px', fontSize: '14px', color: '#000', fontWeight: '700', boxSizing: 'border-box' }} />
+              <input type="text" placeholder="https://menukaapfi.vercel.app" defaultValue={settings.menuDomain || 'https://menukaapfi.vercel.app'} onBlur={e => updateSettings({ ...settings, menuDomain: e.target.value.trim() })} style={{ width: '100%', padding: '12px', border: '2px solid #FC8019', borderRadius: '8px', fontSize: '14px', color: '#000', fontWeight: '700', boxSizing: 'border-box' }} />
             </div>
 
             {/* Per-Table QR Codes */}
@@ -2456,7 +2467,7 @@ export default function CafePOS() {
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(150px, 1fr))', gap: '12px' }}>
                 {[1, 2, 3, 4, 'TA'].map(t => {
                   const label = t === 'TA' ? 'Takeaway' : `Table ${t}`;
-                  const menuDomain = (settings.menuDomain || 'https://menukaapfi.netlify.app').replace(/\/$/, '');
+                  const menuDomain = (settings.menuDomain || 'https://menukaapfi.vercel.app').replace(/\/$/, '');
                   const url = `${menuDomain}?table=${t}`;
                   return (
                     <div key={t} style={{ background: '#f9f9f9', borderRadius: '10px', padding: '14px', textAlign: 'center', border: '1px solid #eee' }}>
