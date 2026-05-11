@@ -1236,7 +1236,7 @@ export default function CafePOS() {
         </div>
       )}
 
-      <header style={{ background: 'linear-gradient(135deg, #FC8019 0%, #E64A19 100%)', padding: '16px 24px', position: 'sticky', top: 0, zIndex: 100 }}>
+      {!isPublicMenuMode && <header style={{ background: 'linear-gradient(135deg, #FC8019 0%, #E64A19 100%)', padding: '16px 24px', position: 'sticky', top: 0, zIndex: 100 }}>
         <div style={{ maxWidth: '1400px', margin: '0 auto', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
             <div style={{ fontSize: '32px' }}>☕</div>
@@ -1255,9 +1255,9 @@ export default function CafePOS() {
             <button onClick={handleLogout} style={{ background: 'rgba(255,255,255,0.25)', color: '#fff', border: '1px solid #fff', padding: '8px 16px', borderRadius: '20px', cursor: 'pointer', fontSize: '13px', fontWeight: '700' }}>Logout</button>
           </div>
         </div>
-      </header>
+      </header>}
 
-      <nav style={{ background: '#fff', display: 'flex', borderBottom: '1px solid #eee', padding: '0 24px', overflowX: 'auto', gap: '8px' }}>
+      {!isPublicMenuMode && <nav style={{ background: '#fff', display: 'flex', borderBottom: '1px solid #eee', padding: '0 24px', overflowX: 'auto', gap: '8px' }}>
         {[
           { id: 'order', icon: '🛒', label: 'New Order' },
           { id: 'bills', icon: '🧾', label: 'Bills' },
@@ -1285,9 +1285,9 @@ export default function CafePOS() {
             </button>
           );
         })}
-      </nav>
+      </nav>}
 
-      <div style={{ maxWidth: '1400px', margin: '0 auto', padding: '24px' }}>
+      <div style={{ maxWidth: '1400px', margin: '0 auto', padding: isPublicMenuMode ? '0' : '24px' }}>
 
         {activeTab === 'order' && (
           <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) 420px', gap: '24px' }}>
