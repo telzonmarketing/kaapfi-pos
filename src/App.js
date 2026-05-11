@@ -214,6 +214,7 @@ function downloadCSV(data, filename) {
 
 export default function CafePOS() {
   const [isLoggedIn, setIsLoggedIn] = useState(false);
+  const [isPublicMenuMode, setIsPublicMenuMode] = useState(false);
   const [loginInput, setLoginInput] = useState('');
   const [loginError, setLoginError] = useState('');
   const [orders, setOrders] = useState([]);
@@ -309,6 +310,7 @@ export default function CafePOS() {
     const tabParam = urlParams.get('tab');
     if (tabParam === 'publicmenu') {
       setActiveTab('publicmenu');
+      setIsPublicMenuMode(true);
       const tableParam = urlParams.get('table');
       if (tableParam) {
         const t = tableParam === 'TA' ? 'T/A' : parseInt(tableParam);
@@ -433,6 +435,21 @@ export default function CafePOS() {
       unsubUpsellSettings();
     };
   }, [isLoggedIn]);
+
+  // PUBLIC MENU MODE - load only menu, settings, table status (no login needed)
+  useEffect(() => {
+    if (!isPublicMenuMode) return;
+    const unsubMenu = onSnapshot(doc(db, "appData", "menu"), (snap) => {
+      if (snap.exists()) setMenuItems(snap.data().items || defaultMenu);
+    });
+    const unsubSettings = onSnapshot(doc(db, "appData", "settings"), (snap) => {
+      if (snap.exists()) setSettings({ ...defaultSettings, ...snap.data().data });
+    });
+    const unsubTableStatus = onSnapshot(doc(db, "appData", "tableStatus"), (snap) => {
+      if (snap.exists()) setTableStatus(snap.data().data || { 1: 'available', 2: 'available', 3: 'available', 4: 'available' });
+    });
+    return () => { unsubMenu(); unsubSettings(); unsubTableStatus(); };
+  }, [isPublicMenuMode]);
 
   // Load customers when tab opened
   useEffect(() => {
@@ -1075,7 +1092,7 @@ export default function CafePOS() {
   const netCashInHand = cashReceived - cashExpenses;
   const netProfit = totalReceived - totalExpenses;
 
-  if (!isLoggedIn) {
+  if (!isLoggedIn && !isPublicMenuMode) {
     return (
       <div style={{ minHeight: '100vh', background: 'linear-gradient(135deg, #FC8019 0%, #E64A19 100%)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: 'system-ui, sans-serif', padding: '20px' }}>
         <div style={{ background: '#fff', padding: '48px 40px', borderRadius: '16px', maxWidth: '420px', width: '100%', textAlign: 'center' }}>
