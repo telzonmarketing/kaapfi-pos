@@ -293,8 +293,11 @@ export default function CafePOS() {
   const knownOrderIdsRef = useRef(null);
   const [tableStatus, setTableStatus] = useState({ 1: 'available', 2: 'available', 3: 'available', 4: 'available' });
   const [featuredItems, setFeaturedItems] = useState(() => { try { return JSON.parse(localStorage.getItem('featuredItems') || '[]'); } catch(e) { return []; } });
+  const [reelItems, setReelItems] = useState(() => { try { return JSON.parse(localStorage.getItem('reelItems') || '[]'); } catch(e) { return []; } }); // [{itemId, videoUrl}] max 3
   const [cashCalcInput, setCashCalcInput] = useState('');
   const [cashCalcBill, setCashCalcBill] = useState('');
+  const [showContactExport, setShowContactExport] = useState(false);
+  const [contactExportPass, setContactExportPass] = useState('');
   const [menuItemImages, setMenuItemImages] = useState({});
   const [upsellItems, setUpsellItems] = useState([]);
   const [showUpsellPopup, setShowUpsellPopup] = useState(false);
@@ -2028,7 +2031,51 @@ export default function CafePOS() {
 
         {activeTab === 'customers' && (
           <div>
-            <h2 style={{ fontSize: '24px', margin: '0 0 20px', color: '#000', fontWeight: '800' }}>👥 Customers</h2>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px', flexWrap: 'wrap', gap: '10px' }}>
+              <h2 style={{ fontSize: '24px', margin: 0, color: '#000', fontWeight: '800' }}>👥 Customers</h2>
+              <button onClick={() => { setShowContactExport(true); setContactExportPass(''); }} style={{ padding: '10px 18px', background: '#1565C0', color: '#fff', border: 'none', borderRadius: '8px', fontWeight: '800', fontSize: '13px', cursor: 'pointer' }}>📥 Export Contacts</button>
+            </div>
+
+            {/* ── CONTACT EXPORT PASSWORD MODAL ── */}
+            {showContactExport && (
+              <div style={{ position: 'fixed', inset: 0, zIndex: 999, background: 'rgba(0,0,0,0.55)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px' }}>
+                <div style={{ background: '#fff', borderRadius: '16px', padding: '32px 28px', maxWidth: '400px', width: '100%', textAlign: 'center' }}>
+                  <div style={{ fontSize: '48px', marginBottom: '8px' }}>🔒</div>
+                  <h3 style={{ fontSize: '20px', fontWeight: '800', margin: '0 0 6px', color: '#000' }}>Export Contacts</h3>
+                  <p style={{ fontSize: '13px', color: '#666', margin: '0 0 20px' }}>Enter password to download {allCustomers.filter(c=>c.phone).length} customer contacts</p>
+                  <input autoFocus type="password" placeholder="Enter password" value={contactExportPass} onChange={e => setContactExportPass(e.target.value)} onKeyPress={e => {
+                    if (e.key !== 'Enter') return;
+                    if (contactExportPass !== DELETE_PASSWORD) { alert('❌ Wrong password'); setContactExportPass(''); return; }
+                    // trigger download
+                    document.getElementById('contactExportTrigger').click();
+                  }} style={{ width: '100%', padding: '12px', border: '2px solid #1565C0', borderRadius: '8px', fontSize: '16px', boxSizing: 'border-box', marginBottom: '12px', fontWeight: '700' }} />
+                  <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap', justifyContent: 'center' }}>
+                    <button id="contactExportTrigger" onClick={() => {
+                      if (contactExportPass !== DELETE_PASSWORD) { alert('❌ Wrong password'); setContactExportPass(''); return; }
+                      const rows = allCustomers.filter(c => c.phone);
+                      const csv = 'Name,Phone,Total Orders,Total Spent,Loyalty Points,Last Order\n' +
+                        rows.map(c => `"${c.name || ''}","${c.phone}",${c.totalOrders||0},${c.totalSpent||0},${c.loyaltyPoints||0},"${c.lastOrder||''}"`).join('\n');
+                      const blob = new Blob([csv], { type: 'text/csv' });
+                      const url = URL.createObjectURL(blob);
+                      const a = document.createElement('a'); a.href = url; a.download = `kaapfi-contacts-${new Date().toISOString().split('T')[0]}.csv`; a.click();
+                      URL.revokeObjectURL(url);
+                      setShowContactExport(false); setContactExportPass('');
+                      alert(`✅ Downloaded ${rows.length} contacts!`);
+                    }} style={{ padding: '12px 24px', background: '#1565C0', color: '#fff', border: 'none', borderRadius: '8px', fontWeight: '800', fontSize: '14px', cursor: 'pointer' }}>📥 Download CSV</button>
+                    <button onClick={() => {
+                      if (contactExportPass !== DELETE_PASSWORD) { alert('❌ Wrong password'); setContactExportPass(''); return; }
+                      const rows = allCustomers.filter(c => c.phone);
+                      // Build a printable HTML page and open for PDF save
+                      const html = `<html><head><title>Kaapfi Contacts</title><style>body{font-family:Arial;font-size:12px;padding:20px;}h1{font-size:18px;margin-bottom:4px;}p{color:#666;margin-bottom:16px;}table{width:100%;border-collapse:collapse;}th{background:#1565C0;color:#fff;padding:8px;text-align:left;font-size:11px;}td{padding:7px 8px;border-bottom:1px solid #eee;font-size:11px;}tr:nth-child(even){background:#f5f5f5;}</style></head><body><h1>Kaapfi 90's — Customer Contacts</h1><p>Exported: ${new Date().toLocaleDateString('en-IN')} · Total: ${rows.length} customers</p><table><thead><tr><th>#</th><th>Name</th><th>Phone</th><th>Orders</th><th>Spent</th><th>Points</th></tr></thead><tbody>${rows.map((c,i)=>`<tr><td>${i+1}</td><td>${c.name||'-'}</td><td>${c.phone}</td><td>${c.totalOrders||0}</td><td>₹${c.totalSpent||0}</td><td>${c.loyaltyPoints||0}</td></tr>`).join('')}</tbody></table></body></html>`;
+                      const w = window.open('', '_blank'); w.document.write(html); w.document.close(); setTimeout(() => w.print(), 400);
+                      setShowContactExport(false); setContactExportPass('');
+                    }} style={{ padding: '12px 24px', background: '#E64A19', color: '#fff', border: 'none', borderRadius: '8px', fontWeight: '800', fontSize: '14px', cursor: 'pointer' }}>🖨️ Print / PDF</button>
+                    <button onClick={() => { setShowContactExport(false); setContactExportPass(''); }} style={{ padding: '12px 20px', background: '#f0f0f0', color: '#555', border: 'none', borderRadius: '8px', fontWeight: '700', fontSize: '14px', cursor: 'pointer' }}>Cancel</button>
+                  </div>
+                </div>
+              </div>
+            )}
+
             <div style={{ background: '#fff', padding: '20px', borderRadius: '12px', marginBottom: '20px' }}>
               <div style={{ display: 'flex', gap: '8px' }}>
                 <input type="tel" placeholder="Phone..." value={lookupPhone} onChange={(e) => setLookupPhone(e.target.value)} onKeyPress={(e) => e.key === 'Enter' && performLookup()} style={{ flex: 1, padding: '12px', border: '2px solid #FC8019', borderRadius: '8px', fontSize: '16px' }} />
@@ -2584,6 +2631,44 @@ export default function CafePOS() {
               )}
             </div>
 
+            {/* ── VIDEO REELS (Top 3 Featured) ── */}
+            <div style={{ background: '#fff', padding: '20px', borderRadius: '12px', boxShadow: '0 2px 8px rgba(0,0,0,0.1)', marginBottom: '20px', border: '2px solid #E91E63' }}>
+              <h3 style={{ fontSize: '16px', margin: '0 0 4px', color: '#880E4F', fontWeight: '800' }}>🎬 Video Reels — Top 3 Dishes</h3>
+              <p style={{ fontSize: '13px', color: '#666', fontWeight: '600', marginBottom: '16px' }}>
+                Paste a YouTube, Instagram or direct MP4 video URL for up to 3 dishes. Customers see these as a video reel on the menu. (Videos hosted externally — no storage used here.)
+              </p>
+              {[0, 1, 2].map(idx => {
+                const reel = reelItems[idx] || {};
+                return (
+                  <div key={idx} style={{ background: '#fce4ec', borderRadius: '10px', padding: '14px', marginBottom: '12px', border: '1px solid #f48fb1' }}>
+                    <div style={{ fontSize: '12px', fontWeight: '800', color: '#880E4F', marginBottom: '10px' }}>🎬 Reel #{idx + 1}</div>
+                    <div style={{ display: 'flex', gap: '8px', marginBottom: '8px', flexWrap: 'wrap' }}>
+                      <select value={reel.itemId || ''} onChange={e => {
+                        const updated = [...reelItems]; updated[idx] = { ...(updated[idx] || {}), itemId: Number(e.target.value) };
+                        setReelItems(updated); localStorage.setItem('reelItems', JSON.stringify(updated));
+                      }} style={{ flex: 1, padding: '8px', border: '1.5px solid #f06292', borderRadius: '6px', fontSize: '12px', fontWeight: '700', color: '#000', minWidth: '150px' }}>
+                        <option value="">— Pick a dish —</option>
+                        {menuItems.map(item => <option key={item.id} value={item.id}>{item.emoji} {item.name} · ₹{item.price}</option>)}
+                      </select>
+                    </div>
+                    <input type="url" placeholder="Paste YouTube / Instagram / MP4 URL" value={reel.videoUrl || ''} onChange={e => {
+                      const updated = [...reelItems]; updated[idx] = { ...(updated[idx] || {}), videoUrl: e.target.value };
+                      setReelItems(updated); localStorage.setItem('reelItems', JSON.stringify(updated));
+                    }} style={{ width: '100%', padding: '8px 10px', border: '1.5px solid #f06292', borderRadius: '6px', fontSize: '12px', fontWeight: '600', color: '#000', boxSizing: 'border-box' }} />
+                    {reel.videoUrl && (
+                      <div style={{ marginTop: '8px', fontSize: '11px', color: '#c2185b', fontWeight: '700' }}>
+                        ✅ Video URL saved — will show on customer menu
+                        <button onClick={() => {
+                          const updated = [...reelItems]; updated[idx] = {};
+                          setReelItems(updated); localStorage.setItem('reelItems', JSON.stringify(updated));
+                        }} style={{ marginLeft: '8px', padding: '2px 8px', background: 'none', border: '1px solid #c2185b', borderRadius: '4px', color: '#c2185b', fontSize: '10px', cursor: 'pointer', fontWeight: '700' }}>Remove</button>
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+
             {/* Per-Item Photo Upload */}
             <div style={{ background: '#fff', padding: '20px', borderRadius: '12px', boxShadow: '0 2px 8px rgba(0,0,0,0.1)' }}>
               <h3 style={{ fontSize: '16px', margin: '0 0 4px', color: '#000', fontWeight: '800' }}>🍽️ Menu Item Photos</h3>
@@ -2869,6 +2954,58 @@ export default function CafePOS() {
               <div style={{ padding: '4px 0 6px' }}>
                 <div style={{ fontSize: '22px', fontWeight: '900', color: '#fff', letterSpacing: '-0.5px' }}>{settings.publicMenuHeadline || "What are you craving for?"}</div>
               </div>
+
+              {/* ── VIDEO REELS STRIP ── */}
+              {reelItems.filter(r => r && r.itemId && r.videoUrl).length > 0 && (
+                <div style={{ marginBottom: '18px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '10px' }}>
+                    <span style={{ fontSize: '15px', fontWeight: '900', color: '#E91E63' }}>🎬 Watch & Order</span>
+                    <div style={{ flex: 1, height: '1px', background: 'rgba(233,30,99,0.3)' }} />
+                  </div>
+                  <div className="pm-scroll" style={{ display: 'flex', gap: '12px', overflowX: 'auto', paddingBottom: '8px' }}>
+                    {reelItems.filter(r => r && r.itemId && r.videoUrl).slice(0, 3).map((reel, idx) => {
+                      const item = menuItems.find(i => i.id === reel.itemId);
+                      if (!item) return null;
+                      const inCart = customerMenuOrder.find(ci => ci.id === item.id);
+                      // Detect YouTube and build embed/thumbnail
+                      const ytMatch = reel.videoUrl.match(/(?:youtube\.com\/watch\?v=|youtu\.be\/|youtube\.com\/shorts\/)([A-Za-z0-9_-]{11})/);
+                      const ytId = ytMatch ? ytMatch[1] : null;
+                      return (
+                        <div key={idx} style={{ flexShrink: 0, width: '160px', background: '#163D7A', borderRadius: '14px', border: '2px solid #E91E63', overflow: 'hidden' }}>
+                          {/* Video / Thumbnail */}
+                          <div style={{ position: 'relative', height: '120px', background: '#0a1628', overflow: 'hidden' }}>
+                            {ytId ? (
+                              <iframe
+                                src={`https://www.youtube.com/embed/${ytId}?autoplay=0&mute=1&controls=1&rel=0`}
+                                style={{ width: '100%', height: '100%', border: 'none' }}
+                                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                                allowFullScreen
+                                title={item.name}
+                              />
+                            ) : (
+                              <video src={reel.videoUrl} controls muted playsInline style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                            )}
+                            <div style={{ position: 'absolute', top: '6px', left: '6px', background: '#E91E63', color: '#fff', fontSize: '9px', fontWeight: '900', padding: '2px 7px', borderRadius: '8px', letterSpacing: '0.5px' }}>🎬 REEL</div>
+                          </div>
+                          <div style={{ padding: '10px' }}>
+                            <div style={{ fontSize: '12px', fontWeight: '800', color: '#fff', marginBottom: '2px', lineHeight: 1.2 }}>{item.name}</div>
+                            <div style={{ fontSize: '15px', fontWeight: '900', color: '#FFD54F', marginBottom: '8px' }}>₹{item.price}</div>
+                            {!inCart ? (
+                              <button onClick={() => handlePublicAddToCart(item)} style={{ width: '100%', padding: '6px 0', background: '#E91E63', color: '#fff', border: 'none', borderRadius: '7px', fontWeight: '900', fontSize: '13px', cursor: 'pointer', fontFamily: 'Nunito, sans-serif' }}>Add +</button>
+                            ) : (
+                              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: 'rgba(233,30,99,0.2)', borderRadius: '7px', padding: '3px 6px' }}>
+                                <button onClick={() => setCustomerMenuOrder(customerMenuOrder.map(i=>i.id===item.id?{...i,quantity:i.quantity-1}:i).filter(i=>i.quantity>0))} style={{ background: 'none', color: '#E91E63', border: 'none', width: '24px', height: '24px', fontWeight: '900', fontSize: '18px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>−</button>
+                                <span style={{ fontSize: '14px', fontWeight: '900', color: '#fff' }}>{inCart.quantity}</span>
+                                <button onClick={() => handlePublicAddToCart(item)} style={{ background: '#E91E63', color: '#fff', border: 'none', borderRadius: '5px', width: '24px', height: '24px', fontWeight: '900', fontSize: '16px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>+</button>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
 
               {/* ── TODAY'S SPECIALS (FEATURED ITEMS) ── */}
               {featuredItems.length > 0 && menuItems.filter(i => featuredItems.includes(i.id)).length > 0 && (
