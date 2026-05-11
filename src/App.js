@@ -692,6 +692,29 @@ export default function CafePOS() {
     alert(`✅ Applied!`);
   };
 
+  const buildOrderObject = (paidStatus) => {
+    const now = new Date();
+    return {
+      id: Date.now(), items: currentOrder, subtotal, manualDiscount, promoDiscount, loyaltyRedemption, specialDiscount, totalDiscount,
+      afterDiscount, tax, total, paymentMethod,
+      customerName: customerName || 'Walk-in', customerPhone: customerPhone || '',
+      timestamp: now.toISOString(),
+      date: now.toISOString().split('T')[0],
+      time: now.toLocaleTimeString(),
+      displayDate: now.toLocaleDateString(),
+      status: 'in_progress', startTime: Date.now(),
+      tableNumber: selectedTable || null,
+      paymentStatus: paidStatus, // 'paid' or 'pending'
+    };
+  };
+
+  const clearOrderForm = () => {
+    setCurrentOrder([]); setCustomerName(''); setCustomerPhone(''); setCustomerData(null);
+    setCustomerOrders([]); setPaymentMethod('cash'); setManualDiscountValue(0);
+    setPromoCode(''); setAppliedPromo(null); setRedeemPoints(0);
+    setSelectedTable(null);
+  };
+
   const completeOrder = async () => {
     if (currentOrder.length === 0) { alert('Add items'); return; }
     const stockCheck = checkStockAvailability(currentOrder);
@@ -701,17 +724,7 @@ export default function CafePOS() {
       else { if (!window.confirm(`⚠️ LOW STOCK:\n\n${msg}\n\nContinue?`)) return; }
     }
     setSyncStatus('syncing');
-    const now = new Date();
-    const order = {
-      id: Date.now(), items: currentOrder, subtotal, manualDiscount, promoDiscount, loyaltyRedemption, specialDiscount, totalDiscount,
-      afterDiscount, tax, total, paymentMethod,
-      customerName: customerName || 'Walk-in', customerPhone: customerPhone || '',
-      timestamp: now.toISOString(), // ISO format for consistent sync
-      date: now.toISOString().split('T')[0], // YYYY-MM-DD
-      time: now.toLocaleTimeString(),
-      displayDate: now.toLocaleDateString(),
-      status: 'in_progress', startTime: Date.now(),
-    };
+    const order = buildOrderObject('paid');
     const firebaseDocId = await saveOrderToFirebase(order);
     if (customerPhone.length >= 10) await saveCustomer(customerPhone, order);
     if (appliedPromo) {
@@ -719,11 +732,38 @@ export default function CafePOS() {
       await savePromosToCloud(updatedPromos);
     }
     await deductInventory(currentOrder);
-    setCurrentOrder([]); setCustomerName(''); setCustomerPhone(''); setCustomerData(null);
-    setCustomerOrders([]); setPaymentMethod('cash'); setManualDiscountValue(0);
-    setPromoCode(''); setAppliedPromo(null); setRedeemPoints(0);
+    // Mark table occupied if dine-in
+    if (selectedTable && selectedTable !== 'T/A') {
+      const u = { ...tableStatus, [selectedTable]: 'occupied' }; setTableStatus(u); saveTableStatusToCloud(u);
+    }
+    clearOrderForm();
     setSyncStatus('connected');
-    alert(firebaseDocId ? '✅ Saved & synced to all devices!' : '⚠️ Check internet connection');
+    alert(firebaseDocId ? '✅ Order saved & synced!' : '⚠️ Check internet connection');
+  };
+
+  const placeOrderPending = async () => {
+    if (currentOrder.length === 0) { alert('Add items first'); return; }
+    const stockCheck = checkStockAvailability(currentOrder);
+    if (!stockCheck.sufficient) {
+      const msg = stockCheck.insufficient.map(i => `• ${i.ingredient}: need ${i.needed}${i.unit}, have ${i.available}${i.unit}`).join('\n');
+      if (settings.preventNegativeStock) { alert(`❌ INSUFFICIENT STOCK!\n\n${msg}`); return; }
+      else { if (!window.confirm(`⚠️ LOW STOCK:\n\n${msg}\n\nContinue?`)) return; }
+    }
+    setSyncStatus('syncing');
+    const order = buildOrderObject('pending');
+    const firebaseDocId = await saveOrderToFirebase(order);
+    if (appliedPromo) {
+      const updatedPromos = promoCodes.map(p => p.code === appliedPromo.code ? { ...p, usedCount: (p.usedCount || 0) + 1 } : p);
+      await savePromosToCloud(updatedPromos);
+    }
+    await deductInventory(currentOrder);
+    // Mark table occupied if dine-in
+    if (selectedTable && selectedTable !== 'T/A') {
+      const u = { ...tableStatus, [selectedTable]: 'occupied' }; setTableStatus(u); saveTableStatusToCloud(u);
+    }
+    clearOrderForm();
+    setSyncStatus('connected');
+    alert(firebaseDocId ? '⏳ Order placed! Payment pending — collect later from Bills tab.' : '⚠️ Check internet connection');
   };
 
   const bulkDeleteBills = async () => {
@@ -1434,12 +1474,12 @@ export default function CafePOS() {
                   const remaining = getRemainingServings(item.name);
                   const lowStock = remaining !== Infinity && remaining < 5;
                   return (
-                    <div key={item.id} onClick={() => addToOrder(item)} style={{ background: '#122B45', padding: '16px', borderRadius: '12px', cursor: 'pointer', textAlign: 'center', border: lowStock ? '2px solid #E64A19' : '1px solid rgba(255,255,255,0.08)' }}>
-                      <div style={{ fontSize: '36px', marginBottom: '8px' }}>{item.emoji}</div>
-                      <div style={{ fontSize: '13px', fontWeight: '700', color: '#000', marginBottom: '4px', minHeight: '36px' }}>{item.name}</div>
-                      <div style={{ fontSize: '15px', color: '#E64A19', fontWeight: '800' }}>₹{item.price}</div>
+                    <div key={item.id} onClick={() => addToOrder(item)} style={{ background: item.outOfStock ? 'rgba(18,43,69,0.5)' : '#122B45', padding: '16px', borderRadius: '12px', cursor: item.outOfStock ? 'not-allowed' : 'pointer', textAlign: 'center', border: lowStock ? '2px solid #E64A19' : '1px solid rgba(255,255,255,0.08)', opacity: item.outOfStock ? 0.5 : 1 }}>
+                      <div style={{ fontSize: '36px', marginBottom: '8px', opacity: item.outOfStock ? 0.4 : 1 }}>{item.emoji}</div>
+                      <div style={{ fontSize: '13px', fontWeight: '700', color: '#fff', marginBottom: '4px', minHeight: '36px' }}>{item.name}{item.outOfStock ? ' 🚫' : ''}</div>
+                      <div style={{ fontSize: '15px', color: '#FC8019', fontWeight: '800' }}>₹{item.price}</div>
                       {remaining !== Infinity && (
-                        <div style={{ fontSize: '10px', color: lowStock ? '#E64A19' : '#4CAF50', fontWeight: '700', marginTop: '4px' }}>{lowStock ? '⚠️ ' : '✓ '}{remaining} left</div>
+                        <div style={{ fontSize: '10px', color: lowStock ? '#E64A19' : '#69F0AE', fontWeight: '700', marginTop: '4px' }}>{lowStock ? '⚠️ ' : '✓ '}{remaining} left</div>
                       )}
                     </div>
                   );
@@ -1457,8 +1497,8 @@ export default function CafePOS() {
                   ➕ Adding more items to Table {selectedTable} — existing order loaded
                 </div>
               )}
-              <input type="tel" placeholder="Customer phone" value={customerPhone} onChange={(e) => handlePhoneChange(e.target.value)} style={{ width: '100%', padding: '10px', fontSize: '14px', border: '2px solid #FC8019', borderRadius: '8px', marginBottom: '10px', boxSizing: 'border-box' }} />
-              <input type="text" placeholder="Customer name" value={customerName} onChange={(e) => setCustomerName(e.target.value)} style={{ width: '100%', padding: '10px', fontSize: '14px', border: '1px solid #e0e0e0', borderRadius: '8px', marginBottom: '12px', boxSizing: 'border-box' }} />
+              <input type="tel" placeholder="Customer phone" value={customerPhone} onChange={(e) => handlePhoneChange(e.target.value)} style={{ width: '100%', padding: '10px', fontSize: '14px', border: '2px solid #FC8019', borderRadius: '8px', marginBottom: '10px', boxSizing: 'border-box', background: '#1a3a5c', color: '#fff' }} />
+              <input type="text" placeholder="Customer name" value={customerName} onChange={(e) => setCustomerName(e.target.value)} style={{ width: '100%', padding: '10px', fontSize: '14px', border: '1px solid rgba(255,255,255,0.2)', borderRadius: '8px', marginBottom: '12px', boxSizing: 'border-box', background: '#1a3a5c', color: '#fff' }} />
 
               {customerData && (
                 <>
@@ -1499,16 +1539,16 @@ export default function CafePOS() {
                   currentOrder.map(item => (
                     <div key={item.id} style={{ padding: '10px', background: '#0F2236', borderRadius: '8px', marginBottom: '6px', border: '1px solid rgba(255,255,255,0.08)' }}>
                       <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '6px' }}>
-                        <span style={{ fontSize: '13px', fontWeight: '800', color: '#000' }}>{item.emoji} {item.name}</span>
+                        <span style={{ fontSize: '13px', fontWeight: '800', color: '#fff' }}>{item.emoji} {item.name}</span>
                         <button onClick={() => removeFromOrder(item.id)} style={{ background: 'none', border: 'none', color: '#E64A19', cursor: 'pointer', fontSize: '18px', fontWeight: '700' }}>×</button>
                       </div>
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                         <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
                           <button onClick={() => updateQuantity(item.id, item.quantity - 1)} style={{ width: '24px', height: '24px', borderRadius: '4px', border: '1px solid #FC8019', background: '#fff', color: '#FC8019', cursor: 'pointer', fontWeight: '700' }}>−</button>
-                          <span style={{ minWidth: '20px', textAlign: 'center', fontWeight: '700', fontSize: '14px', color: '#000' }}>{item.quantity}</span>
+                          <span style={{ minWidth: '20px', textAlign: 'center', fontWeight: '700', fontSize: '14px', color: '#fff' }}>{item.quantity}</span>
                           <button onClick={() => updateQuantity(item.id, item.quantity + 1)} style={{ width: '24px', height: '24px', borderRadius: '4px', border: '1px solid #FC8019', background: '#FC8019', color: '#fff', cursor: 'pointer', fontWeight: '700' }}>+</button>
                         </div>
-                        <span style={{ fontWeight: '700', fontSize: '14px', color: '#000' }}>₹{item.price * item.quantity}</span>
+                        <span style={{ fontWeight: '700', fontSize: '14px', color: '#FC8019' }}>₹{item.price * item.quantity}</span>
                       </div>
                     </div>
                   ))
@@ -1520,16 +1560,16 @@ export default function CafePOS() {
                   <div style={{ marginBottom: '10px', padding: '10px', background: '#0F2236', borderRadius: '8px' }}>
                     <label style={{ fontSize: '11px', fontWeight: '700', color: '#FFD54F' }}>💰 Manual Discount</label>
                     <div style={{ display: 'flex', gap: '6px', marginTop: '4px' }}>
-                      <select value={manualDiscountType} onChange={(e) => setManualDiscountType(e.target.value)} style={{ padding: '6px', borderRadius: '4px', border: '1px solid #ddd', fontSize: '12px' }}>
+                      <select value={manualDiscountType} onChange={(e) => setManualDiscountType(e.target.value)} style={{ padding: '6px', borderRadius: '4px', border: '1px solid rgba(255,255,255,0.2)', fontSize: '12px', background: '#1a3a5c', color: '#fff' }}>
                         <option value="flat">₹</option><option value="percent">%</option>
                       </select>
-                      <input type="number" value={manualDiscountValue} onChange={(e) => setManualDiscountValue(e.target.value)} placeholder="0" style={{ flex: 1, padding: '6px', borderRadius: '4px', border: '1px solid #ddd', fontSize: '12px' }} />
+                      <input type="number" value={manualDiscountValue} onChange={(e) => setManualDiscountValue(e.target.value)} placeholder="0" style={{ flex: 1, padding: '6px', borderRadius: '4px', border: '1px solid rgba(255,255,255,0.2)', fontSize: '12px', background: '#1a3a5c', color: '#fff' }} />
                     </div>
                   </div>
                   <div style={{ marginBottom: '10px', padding: '10px', background: '#0F2236', borderRadius: '8px' }}>
                     <label style={{ fontSize: '11px', fontWeight: '700', color: '#90CAF9' }}>🎁 Promo Code</label>
                     <div style={{ display: 'flex', gap: '6px', marginTop: '4px' }}>
-                      <input type="text" value={promoCode} onChange={(e) => setPromoCode(e.target.value.toUpperCase())} placeholder="KF1234" style={{ flex: 1, padding: '6px', borderRadius: '4px', border: '1px solid #ddd', fontSize: '12px' }} />
+                      <input type="text" value={promoCode} onChange={(e) => setPromoCode(e.target.value.toUpperCase())} placeholder="KF1234" style={{ flex: 1, padding: '6px', borderRadius: '4px', border: '1px solid rgba(255,255,255,0.2)', fontSize: '12px', background: '#1a3a5c', color: '#fff' }} />
                       <button onClick={applyPromo} style={{ padding: '6px 12px', background: '#2196F3', color: '#fff', border: 'none', borderRadius: '4px', cursor: 'pointer', fontSize: '11px', fontWeight: '700' }}>Apply</button>
                     </div>
                   </div>
@@ -1547,7 +1587,7 @@ export default function CafePOS() {
                   {paymentMethod === 'cash' && (
                     <div style={{ marginBottom: '10px', padding: '10px', background: 'rgba(76,175,80,0.12)', borderRadius: '8px', border: '1px solid rgba(76,175,80,0.3)' }}>
                       <label style={{ fontSize: '11px', fontWeight: '700', color: '#69F0AE' }}>💵 Cash Received</label>
-                      <input type="number" value={cashReceivedInput} onChange={e => setCashReceivedInput(e.target.value)} placeholder={`₹${total.toFixed(0)}`} style={{ width: '100%', padding: '8px', borderRadius: '6px', border: '1px solid #4CAF50', marginTop: '4px', fontSize: '14px', fontWeight: '700', boxSizing: 'border-box' }} />
+                      <input type="number" value={cashReceivedInput} onChange={e => setCashReceivedInput(e.target.value)} placeholder={`₹${total.toFixed(0)}`} style={{ width: '100%', padding: '8px', borderRadius: '6px', border: '1px solid #4CAF50', marginTop: '4px', fontSize: '14px', fontWeight: '700', boxSizing: 'border-box', background: '#1a3a5c', color: '#fff' }} />
                       {cashReceivedInput && parseFloat(cashReceivedInput) >= total && (
                         <div style={{ marginTop: '6px', fontSize: '15px', fontWeight: '800', color: '#2E7D32' }}>💰 Change: ₹{(parseFloat(cashReceivedInput) - total).toFixed(0)}</div>
                       )}
@@ -1563,11 +1603,11 @@ export default function CafePOS() {
                       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '6px', marginTop: '6px' }}>
                         <div>
                           <div style={{ fontSize: '10px', fontWeight: '700', color: '#c8e0f4', marginBottom: '3px' }}>💵 Cash</div>
-                          <input type="number" value={splitCash} onChange={e => { setSplitCash(e.target.value); setSplitUpi((total - parseFloat(e.target.value || 0)).toFixed(0)); }} placeholder="0" style={{ width: '100%', padding: '8px', borderRadius: '6px', border: '1px solid #FC8019', fontSize: '14px', fontWeight: '700', boxSizing: 'border-box' }} />
+                          <input type="number" value={splitCash} onChange={e => { setSplitCash(e.target.value); setSplitUpi((total - parseFloat(e.target.value || 0)).toFixed(0)); }} placeholder="0" style={{ width: '100%', padding: '8px', borderRadius: '6px', border: '1px solid #FC8019', fontSize: '14px', fontWeight: '700', boxSizing: 'border-box', background: '#1a3a5c', color: '#fff' }} />
                         </div>
                         <div>
                           <div style={{ fontSize: '10px', fontWeight: '700', color: '#c8e0f4', marginBottom: '3px' }}>📱 UPI</div>
-                          <input type="number" value={splitUpi} onChange={e => { setSplitUpi(e.target.value); setSplitCash((total - parseFloat(e.target.value || 0)).toFixed(0)); }} placeholder="0" style={{ width: '100%', padding: '8px', borderRadius: '6px', border: '1px solid #FC8019', fontSize: '14px', fontWeight: '700', boxSizing: 'border-box' }} />
+                          <input type="number" value={splitUpi} onChange={e => { setSplitUpi(e.target.value); setSplitCash((total - parseFloat(e.target.value || 0)).toFixed(0)); }} placeholder="0" style={{ width: '100%', padding: '8px', borderRadius: '6px', border: '1px solid #FC8019', fontSize: '14px', fontWeight: '700', boxSizing: 'border-box', background: '#1a3a5c', color: '#fff' }} />
                         </div>
                       </div>
                       {splitCash && splitUpi && (
@@ -1577,11 +1617,12 @@ export default function CafePOS() {
                       )}
                     </div>
                   )}
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '6px', marginBottom: '6px' }}>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '6px', marginBottom: '8px' }}>
                     <button onClick={printBill} style={{ padding: '10px', background: '#0F2236', color: '#FC8019', border: '2px solid #FC8019', borderRadius: '6px', fontWeight: '700', cursor: 'pointer', fontSize: '12px' }}>🖨️ Print</button>
                     <button onClick={sendWhatsApp} style={{ padding: '10px', background: '#25D366', color: '#fff', border: 'none', borderRadius: '6px', fontWeight: '700', cursor: 'pointer', fontSize: '12px' }}>📱 WhatsApp</button>
                   </div>
-                  <button onClick={completeOrder} style={{ width: '100%', padding: '14px', background: 'linear-gradient(135deg, #4CAF50 0%, #388E3C 100%)', color: '#fff', border: 'none', borderRadius: '8px', fontWeight: '700', cursor: 'pointer', fontSize: '15px' }}>✅ Complete • ₹{total.toFixed(0)}</button>
+                  <button onClick={completeOrder} style={{ width: '100%', padding: '14px', background: 'linear-gradient(135deg, #4CAF50 0%, #2E7D32 100%)', color: '#fff', border: 'none', borderRadius: '8px', fontWeight: '800', cursor: 'pointer', fontSize: '15px', marginBottom: '8px' }}>✅ Complete &amp; Paid • ₹{total.toFixed(0)}</button>
+                  <button onClick={placeOrderPending} style={{ width: '100%', padding: '12px', background: 'linear-gradient(135deg, #FF9800 0%, #E65100 100%)', color: '#fff', border: 'none', borderRadius: '8px', fontWeight: '800', cursor: 'pointer', fontSize: '14px' }}>⏳ Place Order — Pay Later • ₹{total.toFixed(0)}</button>
                 </>
               )}
             </div>
