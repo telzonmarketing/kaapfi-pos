@@ -257,6 +257,7 @@ export default function CafePOS() {
   const [lookupLoading, setLookupLoading] = useState(false);
   const [allCustomers, setAllCustomers] = useState([]);
   const [selectedBills, setSelectedBills] = useState([]);
+  const [expandedBillId, setExpandedBillId] = useState(null);
   const [selectedPromos, setSelectedPromos] = useState([]);
   const [selectedMenuItems, setSelectedMenuItems] = useState([]);
   const [showDeletePassword, setShowDeletePassword] = useState(null);
@@ -2082,33 +2083,92 @@ export default function CafePOS() {
                 {todayOrders.slice().reverse().map(order => {
                   const isPaid = order.paymentStatus === 'paid';
                   const isPublic = order.source === 'public_menu';
+                  const isExpanded = expandedBillId === order.id;
+                  const orderTotal = order.total || (order.items || []).reduce((s, i) => s + (i.price || 0) * (i.quantity || 1), 0);
                   return (
-                  <div key={order.id} style={{ background: '#122B45', padding: '16px', borderRadius: '12px', display: 'flex', gap: '12px', border: selectedBills.includes(order.id) ? '2px solid #FC8019' : isPublic && !isPaid ? '2px solid #FF9800' : '1px solid rgba(255,255,255,0.08)' }}>
-                    <input type="checkbox" checked={selectedBills.includes(order.id)} onChange={() => toggleBill(order.id)} style={{ width: '20px', height: '20px', marginTop: '4px' }} />
-                    <div style={{ flex: 1 }}>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', flexWrap: 'wrap', gap: '8px' }}>
-                        <div>
-                          <div style={{ fontWeight: '700', color: '#fff', display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
-                            #{order.id.toString().slice(-5)}
-                            {isPublic && <span style={{ fontSize: '10px', background: 'rgba(21,101,192,0.4)', color: '#90CAF9', padding: '2px 7px', borderRadius: '10px', fontWeight: '700' }}>🌐 Online</span>}
-                            {order.tableNumber && <span style={{ fontSize: '10px', background: 'rgba(106,27,154,0.4)', color: '#CE93D8', padding: '2px 7px', borderRadius: '10px', fontWeight: '700' }}>{order.tableNumber === 'T/A' ? '📦 Takeaway' : `🪑 Table ${order.tableNumber}`}</span>}
+                  <div key={order.id} style={{ background: '#122B45', borderRadius: '12px', border: selectedBills.includes(order.id) ? '2px solid #FC8019' : isPaid ? '1px solid rgba(76,175,80,0.3)' : '2px solid rgba(230,74,25,0.45)', overflow: 'hidden' }}>
+                    {/* Header row */}
+                    <div style={{ padding: '14px 16px', display: 'flex', gap: '10px', alignItems: 'flex-start' }}>
+                      <input type="checkbox" checked={selectedBills.includes(order.id)} onChange={() => toggleBill(order.id)} style={{ width: '18px', height: '18px', marginTop: '3px', flexShrink: 0 }} />
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '6px' }}>
+                          <div>
+                            <div style={{ fontWeight: '800', color: '#fff', fontSize: '15px', display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
+                              <span style={{ color: '#FC8019' }}>#{order.id.toString().slice(-5)}</span>
+                              {order.tableNumber && <span style={{ fontSize: '11px', background: 'rgba(156,39,176,0.35)', color: '#CE93D8', padding: '2px 9px', borderRadius: '10px', fontWeight: '800', border: '1px solid rgba(156,39,176,0.4)' }}>{order.tableNumber === 'T/A' ? '📦 Takeaway' : `🪑 Table ${order.tableNumber}`}</span>}
+                              {isPublic && <span style={{ fontSize: '10px', background: 'rgba(33,150,243,0.3)', color: '#90CAF9', padding: '2px 7px', borderRadius: '10px', fontWeight: '700' }}>🌐 Online</span>}
+                            </div>
+                            <div style={{ fontSize: '12px', color: '#c8e0f4', marginTop: '3px' }}>{order.customerName}{order.customerPhone ? ` · ${order.customerPhone}` : ''} · {order.time}</div>
                           </div>
-                          <div style={{ fontSize: '12px', color: '#c8e0f4', marginTop: '4px' }}>{order.customerName} {order.customerPhone && `• ${order.customerPhone}`} • {order.time}</div>
+                          <div style={{ textAlign: 'right', flexShrink: 0 }}>
+                            <div style={{ fontSize: '20px', fontWeight: '900', color: '#FC8019' }}>₹{orderTotal.toFixed(0)}</div>
+                            <div style={{ fontSize: '10px', color: '#c8e0f4', textTransform: 'uppercase', letterSpacing: '0.5px' }}>{order.paymentMethod || 'cash'}</div>
+                          </div>
                         </div>
-                        <div style={{ textAlign: 'right' }}>
-                          <div style={{ fontSize: '18px', fontWeight: '700', color: '#FC8019' }}>₹{order.total?.toFixed(0)}</div>
-                          <div style={{ fontSize: '11px', color: '#c8e0f4', textTransform: 'uppercase' }}>{order.paymentMethod}</div>
-                          <div style={{ marginTop: '4px' }}>
-                            {isPaid
-                              ? <span style={{ fontSize: '11px', background: '#e8f5e9', color: '#2E7D32', padding: '3px 10px', borderRadius: '10px', fontWeight: '700' }}>✅ Paid</span>
-                              : <button onClick={() => markPaymentPaid(order.id)} style={{ fontSize: '11px', background: '#FFF3E0', color: '#E64A19', border: '1px solid #FC8019', padding: '3px 10px', borderRadius: '10px', fontWeight: '700', cursor: 'pointer' }}>💰 Mark Paid</button>
-                            }
+                        {/* Summary item list */}
+                        <div style={{ fontSize: '12px', color: 'rgba(200,224,244,0.7)', margin: '6px 0 10px', lineHeight: '1.5' }}>
+                          {(order.items || []).map(i => `${i.name} ×${i.quantity}`).join(' · ')}
+                        </div>
+                        {/* Action buttons */}
+                        <div style={{ display: 'flex', gap: '7px', flexWrap: 'wrap' }}>
+                          <button onClick={() => setExpandedBillId(isExpanded ? null : order.id)}
+                            style={{ padding: '7px 14px', background: isExpanded ? '#FC8019' : 'rgba(252,128,25,0.15)', color: isExpanded ? '#fff' : '#FC8019', border: '1.5px solid #FC8019', borderRadius: '8px', cursor: 'pointer', fontSize: '12px', fontWeight: '800' }}>
+                            {isExpanded ? '▲ Hide Bill' : '👁 View Bill'}
+                          </button>
+                          {!isPaid
+                            ? <button onClick={() => { if(window.confirm(`Confirm ₹${orderTotal.toFixed(0)} received from ${order.customerName}?`)) markPaymentPaid(order.id); }}
+                                style={{ padding: '7px 16px', background: '#4CAF50', color: '#fff', border: 'none', borderRadius: '8px', cursor: 'pointer', fontSize: '12px', fontWeight: '900' }}>
+                                ✔ Received Payment
+                              </button>
+                            : <span style={{ fontSize: '12px', background: 'rgba(27,94,32,0.5)', color: '#A5D6A7', padding: '7px 14px', borderRadius: '8px', fontWeight: '800', border: '1px solid rgba(76,175,80,0.3)' }}>✅ Paid</span>
+                          }
+                          <button onClick={() => downloadSingleBill(order)} style={{ padding: '7px 12px', background: '#0F2236', color: '#4CAF50', border: '1px solid rgba(76,175,80,0.4)', borderRadius: '8px', cursor: 'pointer', fontSize: '12px', fontWeight: '700' }}>📥 CSV</button>
+                        </div>
+                      </div>
+                    </div>
+                    {/* Expanded full bill */}
+                    {isExpanded && (
+                      <div style={{ borderTop: '1px solid rgba(255,255,255,0.08)', background: '#0d1f35', padding: '16px' }}>
+                        <div style={{ fontSize: '13px', fontWeight: '900', color: '#FC8019', marginBottom: '12px' }}>📋 Full Bill — #{order.id.toString().slice(-5)}{order.tableNumber ? ` · Table ${order.tableNumber}` : ''}</div>
+                        <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                          <thead>
+                            <tr style={{ borderBottom: '1px solid rgba(255,255,255,0.1)' }}>
+                              <th style={{ textAlign: 'left', fontSize: '11px', color: 'rgba(200,224,244,0.6)', fontWeight: '700', padding: '4px 0', letterSpacing: '0.5px' }}>ITEM</th>
+                              <th style={{ textAlign: 'center', fontSize: '11px', color: 'rgba(200,224,244,0.6)', fontWeight: '700', padding: '4px 0', letterSpacing: '0.5px' }}>QTY</th>
+                              <th style={{ textAlign: 'right', fontSize: '11px', color: 'rgba(200,224,244,0.6)', fontWeight: '700', padding: '4px 0', letterSpacing: '0.5px' }}>RATE</th>
+                              <th style={{ textAlign: 'right', fontSize: '11px', color: 'rgba(200,224,244,0.6)', fontWeight: '700', padding: '4px 0', letterSpacing: '0.5px' }}>AMT</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {(order.items || []).map((item, idx) => (
+                              <tr key={idx} style={{ borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
+                                <td style={{ fontSize: '13px', color: '#fff', fontWeight: '700', padding: '9px 0' }}>{item.emoji} {item.name}</td>
+                                <td style={{ textAlign: 'center', fontSize: '14px', color: '#FFD54F', fontWeight: '900', padding: '9px 0' }}>×{item.quantity}</td>
+                                <td style={{ textAlign: 'right', fontSize: '12px', color: '#c8e0f4', padding: '9px 0' }}>₹{item.price}</td>
+                                <td style={{ textAlign: 'right', fontSize: '13px', color: '#FC8019', fontWeight: '800', padding: '9px 0' }}>₹{(item.price || 0) * (item.quantity || 1)}</td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                        <div style={{ borderTop: '2px solid rgba(252,128,25,0.4)', marginTop: '10px', paddingTop: '10px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '10px' }}>
+                          <div style={{ fontSize: '12px', color: '#c8e0f4', lineHeight: '1.8' }}>
+                            <div>Payment: <strong style={{ color: '#fff', textTransform: 'uppercase' }}>{order.paymentMethod || 'Cash'}</strong></div>
+                            {(order.manualDiscount || 0) > 0 && <div style={{ color: '#69F0AE' }}>Discount: −₹{order.manualDiscount}</div>}
+                            <div>Status: <strong style={{ color: isPaid ? '#69F0AE' : '#FF7043' }}>{isPaid ? 'PAID ✅' : 'PENDING 🔴'}</strong></div>
+                          </div>
+                          <div style={{ textAlign: 'right' }}>
+                            <div style={{ fontSize: '11px', color: 'rgba(200,224,244,0.5)', letterSpacing: '1px' }}>GRAND TOTAL</div>
+                            <div style={{ fontSize: '26px', fontWeight: '900', color: '#FC8019' }}>₹{orderTotal.toFixed(0)}</div>
+                            {!isPaid && (
+                              <button onClick={() => { if(window.confirm(`Confirm ₹${orderTotal.toFixed(0)} received?`)) markPaymentPaid(order.id); }}
+                                style={{ background: '#4CAF50', color: '#fff', border: 'none', borderRadius: '8px', padding: '8px 20px', fontWeight: '900', cursor: 'pointer', fontSize: '14px', marginTop: '8px' }}>
+                                ✔ Received Payment
+                              </button>
+                            )}
                           </div>
                         </div>
                       </div>
-                      <div style={{ fontSize: '12px', color: '#c8e0f4', margin: '8px 0' }}>{(order.items || []).map(i => `${i.name} x${i.quantity}`).join(', ')}</div>
-                      <button onClick={() => downloadSingleBill(order)} style={{ padding: '6px 12px', background: '#0F2236', color: '#4CAF50', border: '1px solid #4CAF50', borderRadius: '4px', cursor: 'pointer', fontSize: '11px' }}>📥 CSV</button>
-                    </div>
+                    )}
                   </div>
                   );
                 })}
