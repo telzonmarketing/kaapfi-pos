@@ -321,6 +321,7 @@ export default function CafePOS() {
   const upsellDismissCount = useRef(0);
   const upsellSessionId = useRef(`sess_${Date.now()}`);
   const [showCartView, setShowCartView] = useState(false);
+  const [viewBillOrder, setViewBillOrder] = useState(null);
   const [editingOrderId, setEditingOrderId] = useState(null);
   const [editingOrderItems, setEditingOrderItems] = useState([]);
 
@@ -1267,6 +1268,68 @@ export default function CafePOS() {
     );
   }
 
+  const ViewBillModal = () => {
+    if (!viewBillOrder) return null;
+    const o = viewBillOrder;
+    const isPaid = o.paymentStatus === 'paid';
+    const orderTotal = o.total || (o.items || []).reduce((s, i) => s + (i.price || 0) * (i.quantity || 1), 0);
+    return (
+      <div onClick={() => setViewBillOrder(null)} style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.7)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1200, padding: '16px' }}>
+        <div onClick={e => e.stopPropagation()} style={{ background: '#0d1f35', borderRadius: '16px', width: '100%', maxWidth: '440px', maxHeight: '90vh', overflowY: 'auto', border: '2px solid rgba(252,128,25,0.5)', boxShadow: '0 20px 60px rgba(0,0,0,0.6)' }}>
+          {/* Modal header */}
+          <div style={{ padding: '18px 20px 14px', borderBottom: '1px solid rgba(255,255,255,0.08)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <div>
+              <div style={{ fontSize: '18px', fontWeight: '900', color: '#FC8019' }}>🧾 Bill #{o.id.toString().slice(-5)}</div>
+              <div style={{ fontSize: '12px', color: '#c8e0f4', marginTop: '3px' }}>
+                {o.tableNumber && o.tableNumber !== 'T/A' ? `🪑 Table ${o.tableNumber}` : o.tableNumber === 'T/A' ? '📦 Takeaway' : ''}{o.customerName ? `  ·  ${o.customerName}` : ''}
+              </div>
+              <div style={{ fontSize: '11px', color: 'rgba(200,224,244,0.5)', marginTop: '2px' }}>{o.date} · {o.time}</div>
+            </div>
+            <button onClick={() => setViewBillOrder(null)} style={{ background: 'rgba(255,255,255,0.08)', border: 'none', color: '#fff', borderRadius: '8px', width: '36px', height: '36px', fontSize: '18px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>✕</button>
+          </div>
+          {/* Items list */}
+          <div style={{ padding: '16px 20px' }}>
+            {(o.items || []).map((item, idx) => (
+              <div key={idx} style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '12px 0', borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
+                <div style={{ fontSize: '28px', width: '36px', textAlign: 'center' }}>{item.emoji || '🍽️'}</div>
+                <div style={{ flex: 1 }}>
+                  <div style={{ fontSize: '14px', fontWeight: '800', color: '#fff' }}>{item.name}</div>
+                  <div style={{ fontSize: '12px', color: 'rgba(200,224,244,0.6)', marginTop: '2px' }}>₹{item.price} × {item.quantity}</div>
+                </div>
+                <div style={{ fontSize: '16px', fontWeight: '900', color: '#FC8019' }}>₹{(item.price || 0) * (item.quantity || 1)}</div>
+              </div>
+            ))}
+          </div>
+          {/* Footer total */}
+          <div style={{ padding: '14px 20px 20px', borderTop: '2px solid rgba(252,128,25,0.3)', background: 'rgba(0,0,0,0.2)' }}>
+            {(o.manualDiscount || 0) > 0 && (
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px', color: '#69F0AE', marginBottom: '6px' }}>
+                <span>Discount</span><span>−₹{o.manualDiscount}</span>
+              </div>
+            )}
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px' }}>
+              <div>
+                <div style={{ fontSize: '11px', color: 'rgba(200,224,244,0.5)', letterSpacing: '1px', marginBottom: '2px' }}>GRAND TOTAL</div>
+                <div style={{ fontSize: '28px', fontWeight: '900', color: '#FC8019' }}>₹{orderTotal.toFixed(0)}</div>
+                <div style={{ fontSize: '11px', color: '#c8e0f4', textTransform: 'uppercase' }}>{o.paymentMethod || 'Cash'}</div>
+              </div>
+              <div style={{ textAlign: 'right' }}>
+                {isPaid
+                  ? <div style={{ background: '#1B5E20', color: '#A5D6A7', padding: '10px 20px', borderRadius: '10px', fontWeight: '900', fontSize: '15px' }}>✅ PAID</div>
+                  : <button onClick={() => { if(window.confirm(`Confirm ₹${orderTotal.toFixed(0)} received?`)) { markPaymentPaid(o.id); setViewBillOrder(null); } }}
+                      style={{ background: '#4CAF50', color: '#fff', border: 'none', borderRadius: '10px', padding: '12px 22px', fontWeight: '900', cursor: 'pointer', fontSize: '15px' }}>
+                      ✔ Received<br/>Payment
+                    </button>
+                }
+              </div>
+            </div>
+            <button onClick={() => setViewBillOrder(null)} style={{ width: '100%', padding: '11px', background: 'rgba(255,255,255,0.07)', color: '#c8e0f4', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '8px', cursor: 'pointer', fontWeight: '700', fontSize: '13px' }}>Close</button>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
   const ModifyCartModal = () => editingOrderId && (
     <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.55)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1100 }}>
       <div style={{ background: '#fff', padding: '24px', borderRadius: '14px', minWidth: '340px', maxWidth: '480px', width: '90%' }}>
@@ -1372,6 +1435,7 @@ export default function CafePOS() {
         }
       `}</style>
       <DeleteModal />
+      <ViewBillModal />
       <ModifyCartModal />
 
       {/* New order notifications from public menu */}
@@ -2083,7 +2147,6 @@ export default function CafePOS() {
                 {todayOrders.slice().reverse().map(order => {
                   const isPaid = order.paymentStatus === 'paid';
                   const isPublic = order.source === 'public_menu';
-                  const isExpanded = expandedBillId === order.id;
                   const orderTotal = order.total || (order.items || []).reduce((s, i) => s + (i.price || 0) * (i.quantity || 1), 0);
                   return (
                   <div key={order.id} style={{ background: '#122B45', borderRadius: '12px', border: selectedBills.includes(order.id) ? '2px solid #FC8019' : isPaid ? '1px solid rgba(76,175,80,0.3)' : '2px solid rgba(230,74,25,0.45)', overflow: 'hidden' }}>
@@ -2107,9 +2170,9 @@ export default function CafePOS() {
                         </div>
                         {/* Action buttons */}
                         <div style={{ display: 'flex', gap: '7px', flexWrap: 'wrap', marginTop: '10px' }}>
-                          <button onClick={() => setExpandedBillId(isExpanded ? null : order.id)}
-                            style={{ padding: '7px 18px', background: isExpanded ? '#FC8019' : 'rgba(252,128,25,0.15)', color: isExpanded ? '#fff' : '#FC8019', border: '1.5px solid #FC8019', borderRadius: '8px', cursor: 'pointer', fontSize: '13px', fontWeight: '900' }}>
-                            {isExpanded ? '▲ Close' : '👁 View'}
+                          <button onClick={() => setViewBillOrder(order)}
+                            style={{ padding: '7px 18px', background: 'rgba(252,128,25,0.15)', color: '#FC8019', border: '1.5px solid #FC8019', borderRadius: '8px', cursor: 'pointer', fontSize: '13px', fontWeight: '900' }}>
+                            👁 View
                           </button>
                           {!isPaid
                             ? <button onClick={() => { if(window.confirm(`Confirm ₹${orderTotal.toFixed(0)} received from ${order.customerName}?`)) markPaymentPaid(order.id); }}
@@ -2122,49 +2185,6 @@ export default function CafePOS() {
                         </div>
                       </div>
                     </div>
-                    {/* Expanded full bill */}
-                    {isExpanded && (
-                      <div style={{ borderTop: '1px solid rgba(255,255,255,0.08)', background: '#0d1f35', padding: '16px' }}>
-                        <div style={{ fontSize: '13px', fontWeight: '900', color: '#FC8019', marginBottom: '12px' }}>📋 Full Bill — #{order.id.toString().slice(-5)}{order.tableNumber ? ` · Table ${order.tableNumber}` : ''}</div>
-                        <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-                          <thead>
-                            <tr style={{ borderBottom: '1px solid rgba(255,255,255,0.1)' }}>
-                              <th style={{ textAlign: 'left', fontSize: '11px', color: 'rgba(200,224,244,0.6)', fontWeight: '700', padding: '4px 0', letterSpacing: '0.5px' }}>ITEM</th>
-                              <th style={{ textAlign: 'center', fontSize: '11px', color: 'rgba(200,224,244,0.6)', fontWeight: '700', padding: '4px 0', letterSpacing: '0.5px' }}>QTY</th>
-                              <th style={{ textAlign: 'right', fontSize: '11px', color: 'rgba(200,224,244,0.6)', fontWeight: '700', padding: '4px 0', letterSpacing: '0.5px' }}>RATE</th>
-                              <th style={{ textAlign: 'right', fontSize: '11px', color: 'rgba(200,224,244,0.6)', fontWeight: '700', padding: '4px 0', letterSpacing: '0.5px' }}>AMT</th>
-                            </tr>
-                          </thead>
-                          <tbody>
-                            {(order.items || []).map((item, idx) => (
-                              <tr key={idx} style={{ borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
-                                <td style={{ fontSize: '13px', color: '#fff', fontWeight: '700', padding: '9px 0' }}>{item.emoji} {item.name}</td>
-                                <td style={{ textAlign: 'center', fontSize: '14px', color: '#FFD54F', fontWeight: '900', padding: '9px 0' }}>×{item.quantity}</td>
-                                <td style={{ textAlign: 'right', fontSize: '12px', color: '#c8e0f4', padding: '9px 0' }}>₹{item.price}</td>
-                                <td style={{ textAlign: 'right', fontSize: '13px', color: '#FC8019', fontWeight: '800', padding: '9px 0' }}>₹{(item.price || 0) * (item.quantity || 1)}</td>
-                              </tr>
-                            ))}
-                          </tbody>
-                        </table>
-                        <div style={{ borderTop: '2px solid rgba(252,128,25,0.4)', marginTop: '10px', paddingTop: '10px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '10px' }}>
-                          <div style={{ fontSize: '12px', color: '#c8e0f4', lineHeight: '1.8' }}>
-                            <div>Payment: <strong style={{ color: '#fff', textTransform: 'uppercase' }}>{order.paymentMethod || 'Cash'}</strong></div>
-                            {(order.manualDiscount || 0) > 0 && <div style={{ color: '#69F0AE' }}>Discount: −₹{order.manualDiscount}</div>}
-                            <div>Status: <strong style={{ color: isPaid ? '#69F0AE' : '#FF7043' }}>{isPaid ? 'PAID ✅' : 'PENDING 🔴'}</strong></div>
-                          </div>
-                          <div style={{ textAlign: 'right' }}>
-                            <div style={{ fontSize: '11px', color: 'rgba(200,224,244,0.5)', letterSpacing: '1px' }}>GRAND TOTAL</div>
-                            <div style={{ fontSize: '26px', fontWeight: '900', color: '#FC8019' }}>₹{orderTotal.toFixed(0)}</div>
-                            {!isPaid && (
-                              <button onClick={() => { if(window.confirm(`Confirm ₹${orderTotal.toFixed(0)} received?`)) markPaymentPaid(order.id); }}
-                                style={{ background: '#4CAF50', color: '#fff', border: 'none', borderRadius: '8px', padding: '8px 20px', fontWeight: '900', cursor: 'pointer', fontSize: '14px', marginTop: '8px' }}>
-                                ✔ Received Payment
-                              </button>
-                            )}
-                          </div>
-                        </div>
-                      </div>
-                    )}
                   </div>
                   );
                 })}
