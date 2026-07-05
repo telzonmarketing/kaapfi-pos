@@ -1,0 +1,65 @@
+:root{
+  --bg:#071017;
+  --panel:#0d1b23;
+  --card:#0f2a34;
+  --muted:#94a3b8;
+  --accent:#d85a2e;
+  --accent-2:#2f7b63;
+  --danger:#c94b3f;
+  --glass: rgba(255,255,255,0.03);
+  --glass-2: rgba(0,0,0,0.5);
+}
+
+/* Global background and text */
+html,body,#root{background:var(--bg) !important;color:#dbe7ee !important;}
+body{font-family: system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial;}
+
+/* Panels and cards */
+.banner, .header, header, .topbar, .nav { background: linear-gradient(90deg,#0b1b23 0%, #0d232c 100%) !important; color: #e6eef6 !important; }
+.panel, .card, .menu-tile, .tile, .box { background: var(--card) !important; border: 1px solid rgba(255,255,255,0.04) !important; color: #e6eef6 !important; box-shadow: none !important; }
+.menu-tile:hover, .card:hover { transform: translateY(-2px); }
+
+/* Buttons */
+button, .btn, .button { background: linear-gradient(180deg,var(--panel),var(--card)) !important; border: 1px solid rgba(255,255,255,0.04) !important; color: #eaf6ff !important; }
+.btn-primary, .button.primary, button.primary { background: var(--accent) !important; color: #fff !important; border-color: rgba(0,0,0,0.2) !important; }
+.btn-secondary, .button.secondary { background: rgba(255,255,255,0.03) !important; color: var(--muted) !important; }
+
+/* Category chips and badges */
+.category, .chip, .badge, .pill { background: rgba(255,255,255,0.03) !important; color: var(--muted) !important; border: 1px solid rgba(255,255,255,0.03) !important; }
+.category.active, .chip.active, .badge.active { background: var(--accent) !important; color: #fff !important; }
+
+/* Modal / dialogs */
+.modal, .dialog, .variant-modal, .modal-content, .dialog-content { background: linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0.01)) !important; border-radius:10px; border: 1px solid rgba(255,255,255,0.06) !important; color:#e6eef6 !important; }
+.modal .btn-primary, .dialog .btn-primary { background: var(--accent) !important; }
+.modal .btn-secondary, .dialog .btn-secondary { background: rgba(255,255,255,0.06) !important; color: var(--muted) !important; }
+
+/* Inputs */
+input, textarea, select { background: rgba(255,255,255,0.02) !important; color: #e6eef6 !important; border: 1px solid rgba(255,255,255,0.03) !important; }
+
+/* Current order panel */
+.order-panel, .cart, .current-order { background: var(--panel) !important; border-left: 1px solid rgba(255,255,255,0.02) !important; }
+
+/* Footer */
+footer, .footer { background: transparent !important; color: #9fb5c6 !important; }
+
+/* Reduce bright orange accents */
+.accent, .btn-accent, .badge-accent { background: var(--accent) !important; color: #fff !important; }
+
+/* Ensure high specificity for components that hardcode styles */
+body .menu-tile, body .card, body .panel { background: var(--card) !important; }
+
+/* Small utility tweaks */
+.logo, .brand { filter: brightness(0.9) saturate(0.8); }
+.emphasis { color: #cfe7ff !important; }
+
+/* Darken the variant modal specifically */
+.variant-modal .variant-option { background: rgba(255,255,255,0.02) !important; border: 1px solid rgba(255,255,255,0.03) !important; }
+
+/* Printer/receipt area */
+.receipt, .print-preview, .ticket { background: #081219 !important; color: #dbe7ee !important; border: none !important; }
+
+/* Accessibility: focus outlines */
+button:focus, input:focus, select:focus { outline: 2px solid rgba(216,90,46,0.25); outline-offset: 2px; }
+
+/* Fallback — keep dialogs readable */
+.modal .title, .dialog .title, .variant-modal h3 { color: #dbe7ee !important; }
