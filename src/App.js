@@ -239,7 +239,7 @@ function getAIRecommendation(customerOrders, menu) {
 
 function downloadCSV(data, filename) {
   const csv = ['Date,Time,Customer,Phone,Items,Subtotal,Discount,Total,Payment',
-    ...data.map(o => `"${o.date}","${o.time}","${o.customerName || ''}","${o.customerPhone || ''}","${(o.items || []).map(i => `${i.name} x${i.quantity}`).join('; ')}",${o.subtotal || 0},${o.totalDiscount || 0},${o.total || 0},${o.paymentMethod || ''}`)
+    ...data.map(o => `"${o.date}","${o.time}","${o.customerName || ''}","${o.customerPhone || ''}","${(o.items || []).map(i => `${i.name}${i.variant ? ` (${i.variant})` : ''} x${i.quantity}`).join('; ')}",${o.subtotal || 0},${o.totalDiscount || 0},${o.total || 0},${o.paymentMethod || ''}`)
   ].join('\n');
   const blob = new Blob([csv], { type: 'text/csv' });
   const url = URL.createObjectURL(blob);
@@ -357,6 +357,25 @@ export default function CafePOS() {
   const [viewBillOrder, setViewBillOrder] = useState(null);
   const [editingOrderId, setEditingOrderId] = useState(null);
   const [editingOrderItems, setEditingOrderItems] = useState([]);
+  const [variantModal, setVariantModal] = useState({ open: false, item: null, forPublic: false });
+  const [variantChoice, setVariantChoice] = useState('');
+
+  const closeVariantModal = () => { setVariantModal({ open: false, item: null, forPublic: false }); setVariantChoice(''); };
+
+  const confirmVariant = async () => {
+    if (!variantChoice) { alert('Please select an option'); return; }
+    const { item, forPublic } = variantModal;
+    if (forPublic) {
+      // add to customer menu order (public customer flow)
+      const newCart = customerMenuOrder.find(i => i.id === item.id && (i.variant || null) === variantChoice)
+        ? customerMenuOrder.map(i => (i.id === item.id && (i.variant || null) === variantChoice) ? { ...i, quantity: i.quantity + 1 } : i)
+        : [...customerMenuOrder, { ...item, quantity: 1, variant: variantChoice }];
+      setCustomerMenuOrder(newCart);
+    } else {
+      addToOrder(item, variantChoice);
+    }
+    closeVariantModal();
+  };
 
   // LOGIN CHECK
   useEffect(() => {
@@ -717,10 +736,19 @@ export default function CafePOS() {
     await saveInventoryToCloud(newInventory);
   };
 
-  const addToOrder = (item) => {
-    const existing = currentOrder.find(o => o.id === item.id);
-    if (existing) setCurrentOrder(currentOrder.map(o => o.id === item.id ? { ...o, quantity: o.quantity + 1 } : o));
-    else setCurrentOrder([...currentOrder, { ...item, quantity: 1 }]);
+  const addToOrder = (item, variant) => {
+    // If item requires a variant and none provided, open variant modal
+    if (item.requiresVariant && !variant) {
+      setVariantModal({ open: true, item, forPublic: false });
+      return;
+    }
+    const existing = currentOrder.find(o => o.id === item.id && (o.variant || null) === (variant || null));
+    if (existing) setCurrentOrder(currentOrder.map(o => (o.id === item.id && (o.variant || null) === (variant || null)) ? { ...o, quantity: o.quantity + 1 } : o));
+    else {
+      const toAdd = { ...item, quantity: 1 };
+      if (variant) toAdd.variant = variant;
+      setCurrentOrder([...currentOrder, toAdd]);
+    }
   };
   const removeFromOrder = (id) => setCurrentOrder(currentOrder.filter(o => o.id !== id));
   const updateQuantity = (id, qty) => { if (qty <= 0) removeFromOrder(id); else setCurrentOrder(currentOrder.map(o => o.id === id ? { ...o, quantity: qty } : o)); };
@@ -915,9 +943,10 @@ export default function CafePOS() {
     if (currentOrder.length === 0) { alert('No items'); return; }
     const now = new Date();
     const billNo = `K90-${now.getFullYear().toString().slice(2)}${String(now.getMonth()+1).padStart(2,'0')}${String(now.getDate()).padStart(2,'0')}-${String(todayOrders.length + 1).padStart(3,'0')}`;
-    const itemsHTML = currentOrder.map(i => 
-      `<tr><td style="padding:4px 0;">${i.quantity}</td><td style="padding:4px 0;">${i.name}</td><td style="padding:4px 0;text-align:right;">${i.price}</td><td style="padding:4px 0;text-align:right;">${i.price * i.quantity}</td></tr>`
-    ).join('');
+    const itemsHTML = currentOrder.map(i => {
+      const displayName = i.name + (i.variant ? ` (${i.variant})` : '');
+      return `<tr><td style="padding:4px 0;">${i.quantity}</td><td style="padding:4px 0;">${displayName}</td><td style="padding:4px 0;text-align:right;">${i.price}</td><td style="padding:4px 0;text-align:right;">${i.price * i.quantity}</td></tr>`;
+    }).join('');
     const totalItems = currentOrder.reduce((sum, i) => sum + i.quantity, 0);
     
     const receiptHTML = `
@@ -1000,7 +1029,7 @@ export default function CafePOS() {
 
   const sendWhatsApp = () => {
     if (currentOrder.length === 0) { alert('No items'); return; }
-    const text = `*${settings.cafeName}*\n\n*Order:*\n${currentOrder.map(i => `• ${i.name} x${i.quantity} - ₹${i.price * i.quantity}`).join('\n')}\n\n*Total:* ₹${total.toFixed(0)}`;
+    const text = `*${settings.cafeName}*\n\n*Order:*\n${currentOrder.map(i => `• ${i.name}${i.variant ? ` (${i.variant})` : ''} x${i.quantity} - ₹${i.price * i.quantity}`).join('\n')}\n\n*Total:* ₹${total.toFixed(0)}`;
     window.open(`https://wa.me/${customerPhone ? '91' + customerPhone : ''}?text=${encodeURIComponent(text)}`, '_blank');
   };
 
@@ -1110,7 +1139,11 @@ export default function CafePOS() {
   };
 
   const handlePublicAddToCart = (item) => {
-    const newCart = customerMenuOrder.find(i => i.id === item.id)
+    if (item.requiresVariant) {
+      setVariantModal({ open: true, item, forPublic: true });
+      return;
+    }
+    const newCart = customerMenuOrder.find(i => i.id === item.id && (i.variant || null) === (item.variant || null))
       ? customerMenuOrder.map(i => i.id === item.id ? { ...i, quantity: i.quantity + 1 } : i)
       : [...customerMenuOrder, { ...item, quantity: 1 }];
     setCustomerMenuOrder(newCart);
@@ -1326,7 +1359,7 @@ export default function CafePOS() {
               <div key={idx} style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '12px 0', borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
                 <div style={{ fontSize: '28px', width: '36px', textAlign: 'center' }}>{item.emoji || '🍽️'}</div>
                 <div style={{ flex: 1 }}>
-                  <div style={{ fontSize: '14px', fontWeight: '800', color: '#fff' }}>{item.name}</div>
+                  <div style={{ fontSize: '14px', fontWeight: '800', color: '#fff' }}>{item.name}{item.variant ? ` (${item.variant})` : ''}</div>
                   <div style={{ fontSize: '12px', color: 'rgba(200,224,244,0.6)', marginTop: '2px' }}>₹{item.price} × {item.quantity}</div>
                 </div>
                 <div style={{ fontSize: '16px', fontWeight: '900', color: '#FC8019' }}>₹{(item.price || 0) * (item.quantity || 1)}</div>
@@ -1470,6 +1503,26 @@ export default function CafePOS() {
       <DeleteModal />
       <ViewBillModal />
       <ModifyCartModal />
+      {variantModal.open && variantModal.item && (
+        <div onClick={() => closeVariantModal()} style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.6)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1250 }}>
+          <div onClick={e => e.stopPropagation()} style={{ background: '#fff', borderRadius: '12px', padding: '18px', width: '100%', maxWidth: '420px' }}>
+            <h3 style={{ margin: '0 0 8px', color: '#E64A19' }}>Choose {variantModal.item.variantGroup || 'Option'}</h3>
+            <p style={{ margin: '0 0 12px', color: '#333' }}>{variantModal.item.name}</p>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginBottom: '12px' }}>
+              {(variantModal.item.variantOptions || []).map(opt => (
+                <label key={opt} style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '8px', border: '1px solid #eee', borderRadius: '8px', cursor: 'pointer' }}>
+                  <input type="radio" name="variant" checked={variantChoice === opt} onChange={() => setVariantChoice(opt)} />
+                  <span style={{ fontWeight: 800 }}>{opt}</span>
+                </label>
+              ))}
+            </div>
+            <div style={{ display: 'flex', gap: '8px' }}>
+              <button onClick={closeVariantModal} style={{ flex: 1, padding: '10px', background: '#999', color: '#fff', border: 'none', borderRadius: '8px', cursor: 'pointer' }}>Cancel</button>
+              <button onClick={() => confirmVariant()} style={{ flex: 1, padding: '10px', background: '#E64A19', color: '#fff', border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight: 800 }}>Add</button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* New order notifications from public menu */}
       {newMenuOrders.length > 0 && (
@@ -1484,7 +1537,7 @@ export default function CafePOS() {
                 👤 {order.customerName} {order.tableNumber ? `• ${order.tableNumber === 'T/A' ? '📦 Takeaway' : `Table ${order.tableNumber}`}` : ''}
               </div>
               <div style={{ fontSize: '12px', marginBottom: '10px', opacity: 0.85 }}>
-                {(order.items || []).map(i => `${i.name} x${i.quantity}`).join(', ')}
+                {(order.items || []).map(i => `${i.name}${i.variant ? ` (${i.variant})` : ''} x${i.quantity}`).join(', ')}
               </div>
               <div style={{ fontSize: '18px', fontWeight: '800', marginBottom: '10px' }}>₹{order.total?.toFixed(0)}</div>
               <div style={{ display: 'flex', gap: '8px' }}>
@@ -1722,7 +1775,7 @@ export default function CafePOS() {
                   currentOrder.map(item => (
                     <div key={item.id} style={{ padding: '10px', background: '#0F2236', borderRadius: '8px', marginBottom: '6px', border: '1px solid rgba(255,255,255,0.08)' }}>
                       <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '6px' }}>
-                        <span style={{ fontSize: '13px', fontWeight: '800', color: '#fff' }}>{item.emoji} {item.name}</span>
+                        <span style={{ fontSize: '13px', fontWeight: '800', color: '#fff' }}>{item.emoji} {item.name}{item.variant ? ` (${item.variant})` : ''}</span>
                         <button onClick={() => removeFromOrder(item.id)} style={{ background: 'none', border: 'none', color: '#E64A19', cursor: 'pointer', fontSize: '18px', fontWeight: '700' }}>×</button>
                       </div>
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -2120,7 +2173,7 @@ export default function CafePOS() {
                       return (
                         <div key={item.id} style={{ background: '#0F2236', padding: '14px', borderRadius: '10px', marginBottom: '8px', border: '1px solid rgba(255,255,255,0.08)' }}>
                           <div style={{ fontSize: '18px', fontWeight: '900', color: '#fff', marginBottom: '8px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                            <span>{item.emoji} {item.name}</span>
+                            <span>{item.emoji} {item.name}{item.variant ? ` (${item.variant})` : ''}</span>
                             <span style={{ background: '#FC8019', color: '#fff', borderRadius: '8px', padding: '3px 12px', fontSize: '16px', fontWeight: '900' }}>×{item.quantity}</span>
                           </div>
                           {sop.length > 0 ? (
