@@ -112,6 +112,31 @@ button:focus, input:focus, select:focus { outline: 2px solid rgba(216,90,46,0.25
   padding: 8px 0 !important;
 }
 
+/* Fallback: target inline-styled modal containers that don't have .modal/.dialog classes
+   Some modal libraries append a plain <div> with inline styles; this rule ensures the
+   variant popup labels become dark even when there are no helper classes present. */
+div:has(input[type="radio"]) {
+  background: #ffffff !important;
+  color: #111827 !important;
+  border-radius: 10px !important;
+  box-shadow: 0 10px 30px rgba(2,6,23,0.45) !important;
+  border: 1px solid rgba(17,24,39,0.06) !important;
+}
+
+div:has(input[type="radio"]) label,
+div:has(input[type="radio"]) span,
+div:has(input[type="radio"]) .option-label {
+  color: #111827 !important;
+  font-weight: 600 !important;
+}
+
+div:has(input[type="radio"]) input[type="radio"] {
+  width: 18px !important;
+  height: 18px !important;
+  accent-color: #111827 !important;
+  margin-right: 10px !important;
+}
+
 /* Keep buttons unchanged but ensure they read well on a white modal */
 .modal:has(input[type="radio"]) .btn, .dialog:has(input[type="radio"]) .btn { color: inherit !important; }
 
