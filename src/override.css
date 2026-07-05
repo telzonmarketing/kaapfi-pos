@@ -76,3 +76,42 @@ button:focus, input:focus, select:focus { outline: 2px solid rgba(216,90,46,0.25
 
 /* Fallback — keep dialogs readable */
 .modal .title, .dialog .title, .variant-modal h3 { color: #dbe7ee !important; }
+
+/* Variant-popup specific: ensure high-contrast white popup when radios are present */
+/* Use :has() to target modals/dialogs that contain radio inputs (modern browsers like Chrome support this) */
+.modal:has(input[type="radio"]), .dialog:has(input[type="radio"]) {
+  background: #ffffff !important;
+  color: #111827 !important;
+  border-radius: 10px !important;
+  box-shadow: 0 10px 30px rgba(2,6,23,0.45) !important;
+  border: 1px solid rgba(17,24,39,0.06) !important;
+}
+
+.modal:has(input[type="radio"]) label,
+.dialog:has(input[type="radio"]) label,
+.modal:has(input[type="radio"]) .option-label,
+.dialog:has(input[type="radio"]) .option-label {
+  color: #111827 !important; /* dark text */
+  font-weight: 600 !important; /* semibold */
+}
+
+.modal:has(input[type="radio"]) input[type="radio"],
+.dialog:has(input[type="radio"]) input[type="radio"] {
+  /* Make radios larger and use dark accent */
+  width: 18px !important;
+  height: 18px !important;
+  accent-color: #111827 !important; /* modern browsers */
+  margin-right: 10px !important;
+}
+
+/* Ensure the radio option container has sufficient contrast and spacing */
+.modal:has(input[type="radio"]) .variant-option,
+.dialog:has(input[type="radio"]) .variant-option {
+  background: transparent !important;
+  border: none !important;
+  padding: 8px 0 !important;
+}
+
+/* Keep buttons unchanged but ensure they read well on a white modal */
+.modal:has(input[type="radio"]) .btn, .dialog:has(input[type="radio"]) .btn { color: inherit !important; }
+
