@@ -29,9 +29,22 @@ button, .btn, .button { background: linear-gradient(180deg,var(--panel),var(--ca
 .category.active, .chip.active, .badge.active { background: var(--accent) !important; color: #fff !important; }
 
 /* Modal / dialogs */
-.modal, .dialog, .variant-modal, .modal-content, .dialog-content { background: linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0.01)) !important; border-radius:10px; border: 1px solid rgba(255,255,255,0.06) !important; color:#e6eef6 !important; }
-.modal .btn-primary, .dialog .btn-primary { background: var(--accent) !important; }
-.modal .btn-secondary, .dialog .btn-secondary { background: rgba(255,255,255,0.06) !important; color: var(--muted) !important; }
+.modal, .dialog, .variant-modal, .modal-content, .dialog-content, .react-modal-content, .MuiDialog-paper { background: #071218 !important; border-radius:12px !important; border: 1px solid rgba(255,255,255,0.04) !important; color:#dbe7ee !important; box-shadow: 0 8px 30px rgba(0,0,0,0.6) !important; }
+.modal .btn-primary, .dialog .btn-primary { background: #174639 !important; color: #fff !important; border: 1px solid rgba(255,255,255,0.02) !important; }
+.modal .btn-secondary, .dialog .btn-secondary { background: #0c1a1d !important; color: #b9c7d3 !important; border: 1px solid rgba(255,255,255,0.02) !important; }
+
+/* Stronger contrast for modal contents */
+.modal h3, .dialog h3, .variant-modal h3, .modal .title, .dialog .title { color: #cfe7ff !important; }
+.variant-modal .variant-option, .modal .variant-option, .dialog .variant-option { background: rgba(255,255,255,0.018) !important; border: 1px solid rgba(255,255,255,0.02) !important; color: #dbe7ee !important; }
+.variant-modal label, .modal label, .dialog label, .variant-modal .option-label { color: #d7eaf4 !important; }
+.variant-modal input[type="radio"], .modal input[type="radio"], .dialog input[type="radio"] { accent-color: #2ea36f !important; }
+
+/* Modal buttons: darker and less glossy */
+.modal .btn-primary:hover, .dialog .btn-primary:hover { background: #1f6f4f !important; }
+.modal .btn-secondary:hover, .dialog .btn-secondary:hover { background: #0b1718 !important; }
+
+/* Increase modal z-index to ensure visibility */
+.modal, .dialog, .variant-modal { z-index: 99999 !important; }
 
 /* Inputs */
 input, textarea, select { background: rgba(255,255,255,0.02) !important; color: #e6eef6 !important; border: 1px solid rgba(255,255,255,0.03) !important; }
